@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <title>DocScan Pro — Web</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23000'/%3E%3Crect x='14' y='10' width='32' height='42' rx='4' fill='%23fafafa'/%3E%3Cpath d='M46 10v8h-8z' fill='%23ccc'/%3E%3Cline x1='3' y1='12' x2='62' y2='62' stroke='%2300d9a5' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+  <!-- Browser-side OCR + PDF -->
+  <script defer src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+</head>
+<body data-view="library">
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-name">DocScan Pro</span>
+      <span class="brand-tag">Web</span>
+    </div>
+    <button class="icon-btn" id="btn-settings" aria-label="Settings">⚙</button>
+  </header>
+
+  <!-- LIBRARY VIEW -->
+  <section class="view view-library" data-view-id="library">
+    <p class="tagline">Scan anything. No watermark. No cloud.</p>
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input type="search" id="search-input" placeholder="Search by name or extracted text" autocomplete="off">
+    </div>
+    <div class="doc-grid" id="doc-grid"></div>
+    <div class="empty-state" id="empty-state">
+      <div class="empty-thumb"></div>
+      <h2>No documents yet</h2>
+      <p>Tap "New Scan" to capture your first PDF — everything stays in your browser, nothing uploaded.</p>
+    </div>
+    <button class="fab" id="btn-scan">📷 New Scan</button>
+  </section>
+
+  <!-- SCAN VIEW -->
+  <section class="view view-scan" data-view-id="scan" hidden>
+    <div class="topbar">
+      <button class="icon-btn back" data-back="library">←</button>
+      <h1>Capture document</h1>
+    </div>
+    <div class="scan-card">
+      <video id="cam-preview" autoplay playsinline muted></video>
+      <canvas id="cam-canvas" hidden></canvas>
+      <div class="overlay-corners" aria-hidden="true">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <p class="cam-hint" id="cam-hint">Point your camera at the document</p>
+    </div>
+    <div class="scan-actions">
+      <button class="btn-ghost" id="btn-add-from-file">📁 Pick image instead</button>
+      <input type="file" id="file-input" accept="image/*" multiple hidden>
+      <button class="btn-primary" id="btn-capture">📸 Capture page</button>
+    </div>
+    <div class="captured-strip" id="captured-strip" hidden>
+      <p class="strip-label" id="strip-label">0 page captured</p>
+      <div class="strip-row" id="strip-row"></div>
+      <button class="btn-primary" id="btn-finish-scan" disabled>Continue → Editor</button>
+    </div>
+  </section>
+
+  <!-- EDITOR VIEW -->
+  <section class="view view-editor" data-view-id="editor" hidden>
+    <div class="topbar">
+      <button class="icon-btn back" data-back="library">←</button>
+      <h1>Edit document</h1>
+    </div>
+    <div class="card">
+      <p class="section-label" id="editor-summary">0 pages captured</p>
+      <label class="field">
+        <span>Title</span>
+        <input type="text" id="editor-title" placeholder="My Document">
+      </label>
+      <button class="row-btn" id="folder-row">
+        <span class="row-icon">📁</span>
+        <span class="row-body">
+          <span class="row-label">Folder</span>
+          <span class="row-value" id="folder-value">No folder</span>
+        </span>
+        <span class="chev">›</span>
+      </button>
+    </div>
+    <div class="card">
+      <p class="section-label">Extracted text</p>
+      <button class="btn-outline" id="btn-run-ocr">🔎 Extract text (OCR)</button>
+      <pre class="ocr-preview" id="ocr-preview">No text yet — run OCR to extract text from this document.</pre>
+    </div>
+    <div class="bottom-bar">
+      <button class="btn-outline" id="btn-share-editor">📤 Share</button>
+      <button class="btn-primary" id="btn-save">💾 Save to library</button>
+    </div>
+  </section>
+
+  <!-- DETAIL VIEW -->
+  <section class="view view-detail" data-view-id="detail" hidden>
+    <div class="topbar">
+      <button class="icon-btn back" data-back="library">←</button>
+      <h1>Document</h1>
+    </div>
+    <div class="card detail-head">
+      <div class="doc-thumb large"></div>
+      <div>
+        <h2 id="detail-title"></h2>
+        <p class="muted" id="detail-meta"></p>
+        <div class="folder-tag" id="detail-folder">—</div>
+      </div>
+    </div>
+    <button class="btn-primary big" id="btn-open-pdf">📄 Open PDF</button>
+    <button class="row-btn" id="row-share">
+      <span class="row-icon">📤</span>
+      <span class="row-body"><span class="row-label">Share</span><span class="row-value">PDF or extracted text</span></span>
+      <span class="chev">›</span>
+    </button>
+    <button class="row-btn" id="row-lock">
+      <span class="row-icon" style="color:var(--warn)">🔒</span>
+      <span class="row-body"><span class="row-label" id="row-lock-label">Protect with password</span></span>
+      <span class="chev">›</span>
+    </button>
+    <div class="card">
+      <p class="section-label">Extracted text</p>
+      <pre class="ocr-preview" id="detail-ocr"></pre>
+    </div>
+    <button class="row-btn danger" id="row-delete">
+      <span class="row-icon" style="color:var(--danger)">🗑</span>
+      <span class="row-body"><span class="row-label">Delete document</span></span>
+    </button>
+  </section>
+
+  <!-- SETTINGS VIEW -->
+  <section class="view view-settings" data-view-id="settings" hidden>
+    <div class="topbar">
+      <button class="icon-btn back" data-back="library">←</button>
+      <h1>Settings</h1>
+    </div>
+    <button class="row-btn" id="row-theme">
+      <span class="row-icon">🌓</span>
+      <span class="row-body"><span class="row-label">Theme</span><span class="row-value" id="theme-value">Pure black</span></span>
+      <span class="chev">›</span>
+    </button>
+    <button class="row-btn" id="row-quality">
+      <span class="row-icon">📷</span>
+      <span class="row-body"><span class="row-label">Scan quality</span><span class="row-value" id="quality-value">High</span></span>
+      <span class="chev">›</span>
+    </button>
+    <button class="row-btn" id="row-format">
+      <span class="row-icon">💾</span>
+      <span class="row-body"><span class="row-label">Export format</span><span class="row-value" id="format-value">PDF</span></span>
+      <span class="chev">›</span>
+    </button>
+    <p class="section-label" style="margin:24px 4px 6px">About</p>
+    <a class="row-btn" target="_blank" href="https://play.google.com/store/apps/details?id=com.sidkyoussef.docscanpro">
+      <span class="row-icon">★</span>
+      <span class="row-body"><span class="row-label">Get the Android app on Play Store</span></span>
+      <span class="chev">›</span>
+    </a>
+    <a class="row-btn" target="_blank" href="https://www.youtube.com/watch?v=3oso3-GAS-Y">
+      <span class="row-icon">▶</span>
+      <span class="row-body"><span class="row-label">Watch the demo on YouTube</span></span>
+      <span class="chev">›</span>
+    </a>
+    <p class="version-line">DocScan Pro Web · v1.0.0 · 100% offline · No subscription</p>
+  </section>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <script defer src="app.js"></script>
+</body>
+</html>
